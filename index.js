@@ -159,8 +159,6 @@ function elt(name, attrs, ...children) {
 class DOMDisplay {
   constructor(parent, level) {
     this.dom = elt('div', { class: 'game' }, drawGrid(level));
-    console.log(this.dom);
-    console.log(parent);
     this.actorLayer = null;
     parent.appendChild(this.dom);
   }
@@ -243,7 +241,56 @@ DOMDisplay.prototype.scrollPlayerIntoView = function(state) {
     this.dom.scrollTop = center.y + margin - height;
   }
 };
-console.log(document.body);
+
+// touches method tells us whether a rectangle touches a grid element of the given type.
+// The method computes the set of grid squares that the body overlaps with using Math.floor and Math.ceil on its coords.
+// by rounding the sides of a box up and down, we get the range of background squares that the box touches.
+Level.prototype.touches = function(pos, size, type) {
+  var xStart = Math.floor(pos.x);
+  var xEnd = Math.ceil(pos.x + size.x);
+  var yStart = Math.floor(pos.y);
+  var yEnd = Math.ceil(pos.y + size.y);
+
+  for (var y = yStart; y < yEnd; y++) {
+    for (var x = xStart; x < xEnd; x++) {
+      let isOutside = x < 0 || x >= this.width || y < 0 || y <= this.height;
+      let here = isOutside ? 'wall' : this.rows[y][x];
+      if (here == type) return true;
+    }
+  }
+  return false;
+};
+
+// state update method uses touches to figure out whether the player is touching lava.
+
+State.prototype.update = function(time, keys) {
+  let actors = this.actors.map(actor => actor.update(time, this, keys));
+  let newState = new State(this.level, actors, this.status);
+
+  if (newState.status != 'playing') return newState;
+
+  let player = newState.player;
+  if (this.level.touches(player.pos, player.size, 'lava')) {
+    return new State(this.level, actors, 'lost');
+  }
+
+  for (let actor of actors) {
+    if (actor != player && overlap(actor, player)) {
+      newState = actor.collide(newState);
+    }
+  }
+  return newState;
+};
+
+function overlap(actor1, actor2) {
+  return (
+    actor1.pos.x + actor1.size.x > actor2.pos.x &&
+    actor1.pos.x < actor2.pos.x + actor2.size.x &&
+    actor1.pos.y + actor1.size.y > actor2.pos.y &&
+    actor1.pos.y < actor2.pos.y + actor2.size.y
+  );
+}
+
 let simpleLevel = new Level(simpleLevelPlan);
 let display = new DOMDisplay(document.body, simpleLevel);
 display.syncState(State.start(simpleLevel));
