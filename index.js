@@ -306,3 +306,62 @@ Coin.prototype.collide = function(state) {
 let simpleLevel = new Level(simpleLevelPlan);
 let display = new DOMDisplay(document.body, simpleLevel);
 display.syncState(State.start(simpleLevel));
+
+// update method computes a new position by adding the product of the time step and the current speed to its old position.
+// If no obstacle blocks that new position, it moves there. If there is an obstacle, the behavior depends on the type of the lava
+// coins use their update method to wobble (hence ingnore collisions with the grid)
+
+const wobbleSpeed = 8;
+wobbleDist = 0.07;
+
+Coin.prototype.update = function(time) {
+  let wobble = this.wobble + time * wobbleSpeed;
+  let wobblePos = Math.sin(wobble) * wobbleDist;
+  return new Coin(
+    this.basePos.plus(new Vec(0, wobblePos)),
+    this.basePos,
+    wobble
+  );
+};
+
+const playerXSpeed = 7;
+const gravity = 30;
+const jumpSpeed = 17;
+
+Player.prototype.update = function(time, state, keys) {
+  let xSpeed = 0;
+  if (keys.ArrowLeft) xSpeed -= playerXSpeed;
+  if (keys.ArrowRight) xSpeed += playerXSpeed;
+  let pos = this.pos;
+  let moxedX = pos.plus(new Vec(xSpeed * time, 0));
+  if (!state.level.touches(movedX, this.size, 'wall')) {
+    pos = moxedX;
+  }
+
+  let ySpeed = this.speed.y + time * gravity;
+  let movedY = pos.plus(new Vec(0, ySpeed * time));
+  if (!state.level.touches(movedY, this.size, 'wall')) {
+    pos = movedY;
+  } else if (keys.ArrowUp && ySpeed > 0) {
+    ySpeed = -jumpSpeed;
+  } else {
+    ySpeed = 0;
+  }
+  return new Player(pos, new Vec(xSpeed, ySpeed));
+};
+
+// object that tracks the current position of those keys.
+function trackKeys(keys) {
+  let down = Object.create(null);
+  function track(event) {
+    if (keys.includes(event.key)) {
+      down[event.key] = event.type == 'keydown';
+      event.preventDefault();
+    }
+  }
+  window.addEventListener('keydown', track);
+  window.addEventListener('keyup', track);
+  return down;
+}
+
+const arrowKeys = trackKeys(['ArrowLeft', 'ArrowRight', 'ArrowUp']);
